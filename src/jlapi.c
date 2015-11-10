@@ -310,6 +310,13 @@ DLLEXPORT jl_taggedvalue_t *jl_astaggedvalue(jl_value_t *v)
     return jl_astaggedvalue__MACRO(v);
 }
 
+// Create function versions of some useful macros
+#undef jl_valueof
+DLLEXPORT jl_value_t *jl_valueof(jl_taggedvalue_t *v)
+{
+    return jl_valueof__MACRO(v);
+}
+
 #undef jl_typeof
 DLLEXPORT jl_value_t *jl_typeof(jl_value_t *v)
 {

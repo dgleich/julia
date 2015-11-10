@@ -173,8 +173,10 @@ typedef struct {
 } jl_taggedvalue_t;
 
 #define jl_astaggedvalue__MACRO(v) container_of((v),jl_taggedvalue_t,value)
+#define jl_valueof__MACRO(v) (&((jl_taggedvalue_t*)(v))->value)
 #define jl_typeof__MACRO(v) ((jl_value_t*)(jl_astaggedvalue__MACRO(v)->type_bits&~(uintptr_t)15))
 #define jl_astaggedvalue jl_astaggedvalue__MACRO
+#define jl_valueof jl_valueof__MACRO
 #define jl_typeof jl_typeof__MACRO
 static inline void jl_set_typeof(void *v, void *t)
 {

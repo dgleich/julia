@@ -43,8 +43,6 @@ JL_DEFINE_MUTEX(finalizers)
 #define GC_QUEUED 2 // if it is reachable it will be marked as old
 #define GC_MARKED_NOESC (GC_MARKED | GC_QUEUED) // reachable and young
 
-#define jl_valueof(v) (&((jl_taggedvalue_t*)(v))->value)
-
 // This struct must be kept in sync with the Julia type of the same name in base/util.jl
 typedef struct {
     int64_t     allocd;
