@@ -167,6 +167,15 @@ function initialize_shared_array(S, s, onlocalhost, init, pids)
             end
         end
     end
+
+    finalizer(S, finalize_refs)
+    S
+end
+
+function finalize_refs(S)
+    for r in S.refs
+        finalize(r)
+    end
 end
 
 typealias SharedVector{T} SharedArray{T,1}

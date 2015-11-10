@@ -564,7 +564,7 @@ function isready(rr::Future)
     if rr.where == myid()
         isready(lookup_ref(rid).c)
     else
-        remotecall_fetch(id->isready(lookup_ref(rid).c), rr.where, rid)
+        remotecall_fetch(rid->isready(lookup_ref(rid).c), rr.where, rid)
     end
 end
 
@@ -573,7 +573,7 @@ function isready(rr::RemoteRef, args...)
     if rr.where == myid()
         isready(lookup_ref(rid).c, args...)
     else
-        remotecall_fetch(id->isready(lookup_ref(rid).c, args...), rr.where, rid)
+        remotecall_fetch(rid->isready(lookup_ref(rid).c, args...), rr.where, rid)
     end
 end
 
@@ -634,17 +634,15 @@ function add_clients(pairs::Vector)
 end
 
 function send_add_client(rr::AbstractRemoteRef, i)
-    args = isa(rr, Future) ? (remoteref_id(rr), i) : (remoteref_id(rr), (i, :remoteref))
-
     if rr.where == myid()
-        add_client(args...)
+        add_client(remoteref_id(rr), i)
     elseif i != rr.where
         # don't need to send add_client if the message is already going
         # to the processor that owns the remote ref. it will add_client
         # itself inside deserialize().
         w = worker_from_id(rr.where)
         #println("$(myid()) adding $((remoteref_id(rr), i)) for $(rr.where)")
-        push!(w.add_msgs, args)
+        push!(w.add_msgs, (remoteref_id(rr), i))
         w.gcflag = true
         notify(any_gc_flag)
     end
@@ -653,7 +651,7 @@ end
 channel_type{T}(rr::RemoteRef{T}) = T
 
 serialize(s::SerializationState, f::Future) = serialize(s, f, isnull(f.v))
-serialize(s::SerializationState, f::RemoteRef) = serialize(s, rr, true)
+serialize(s::SerializationState, rr::RemoteRef) = serialize(s, rr, true)
 function serialize(s::SerializationState, rr::AbstractRemoteRef, addclient)
     if addclient
         p = worker_id_from_socket(s.io)
@@ -687,7 +685,10 @@ end
 def_rv_channel() = Channel(1)
 type RemoteValue
     c::AbstractChannel
-    clientset::IntSet
+    clientset::IntSet # Set of workerids that have a reference to this channel.
+                      # Keeping ids instead of a count aids in cleaning up upon
+                      # a worker exit.
+
     waitingfor::Int   # processor we need to hear from to fill this, or 0
 
     RemoteValue(c) = new(c, IntSet(), 0)
@@ -881,18 +882,22 @@ fetch(x::ANY) = x
 isready(rv::RemoteValue, args...) = isready(rv.c, args...)
 function put!(rr::Future, v)
     !isnull(rr.v) && error("Future can be set only once")
-    call_on_owner(put_future, rr, v)
+    call_on_owner(put_future, rr, v, myid())
+    rr.v = v
     rr
 end
-function put_future(rid, v)
+function put_future(rid, v, callee)
     rv = lookup_ref(rid)
     isready(rv) && error("Future can be set only once")
     put!(rv, v)
+    # The callee has the value and hence can be removed from the remote store.
+    del_client(rid, callee)
+    nothing
 end
 
 
 put!(rv::RemoteValue, args...) = put!(rv.c, args...)
-put_ref(rid, args...) = put!(lookup_ref(rid), args...)
+put_ref(rid, args...) = (put!(lookup_ref(rid), args...); nothing)
 put!(rr::RemoteRef, args...) = (call_on_owner(put_ref, rr, args...); rr)
 
 # take! is not supported on Future
@@ -1785,10 +1790,14 @@ function terminate_all_workers()
     end
 end
 
-getindex(r::AbstractRemoteRef) = fetch(r)
-function getindex(r::AbstractRemoteRef, args...)
+getindex(r::RemoteRef) = fetch(r)
+getindex(r::Future) = fetch(r)
+
+getindex(r::Future, args...) = getindex(fetch(r), args...)
+function getindex(r::RemoteRef, args...)
     if r.where == myid()
         return getindex(fetch(r), args...)
     end
     return remotecall_fetch(getindex, r.where, r, args...)
 end
+
