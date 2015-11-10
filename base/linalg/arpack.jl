@@ -6,13 +6,13 @@ import ..LinAlg: BlasInt, ARPACKException
 
 ## aupd and eupd wrappers
 
-function aupd_wrapper(T, matvecA::Function, matvecB::Function, solveSI::Function, n::Integer,
+function aupd_wrapper{T}(matvecA::Function, matvecB::Function, solveSI::Function, n::Integer,
                       sym::Bool, cmplx::Bool, bmat::ByteString,
                       nev::Integer, ncv::Integer, which::ByteString,
-                      tol::Real, maxiter::Integer, mode::Integer, v0::Vector)
+                      tol::Real, maxiter::Integer, mode::Integer, v0::Vector{T})
 
     lworkl = cmplx ? ncv * (3*ncv + 5) : (sym ? ncv * (ncv + 8) :  ncv * (3*ncv + 6) )
-    TR = cmplx ? T.types[1] : T
+    TR = typeof(abs(one(T)))
     TOL = Array(TR, 1)
     TOL[1] = tol
 
@@ -20,14 +20,16 @@ function aupd_wrapper(T, matvecA::Function, matvecB::Function, solveSI::Function
     workd  = Array(T, 3*n)
     workl  = Array(T, lworkl)
     rwork  = cmplx ? Array(TR, ncv) : Array(TR, 0)
+    
+    resid = Array(T,n)
+    info = zeros(BlasInt, 1)
+    
 
-    if isempty(v0)
-        resid  = Array(T, n)
-        info   = zeros(BlasInt, 1)
-    else
-        resid  = deepcopy(v0)
+    if ~isempty(v0)
+        resid[:] = v0[:] 
         info   = ones(BlasInt, 1)
     end
+    
     iparam = zeros(BlasInt, 11)
     ipntr  = zeros(BlasInt, (sym && !cmplx) ? 11 : 14)
     ido    = zeros(BlasInt, 1)

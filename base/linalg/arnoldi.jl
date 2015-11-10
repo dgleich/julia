@@ -226,7 +226,7 @@ function _eigs(A, B;
 
     # Compute the Ritz values and Ritz vectors
     (resid, v, ldv, iparam, ipntr, workd, workl, lworkl, rwork, TOL) =
-       ARPACK.aupd_wrapper(T, matvecA, matvecB, solveSI, n, sym, iscmplx, bmat, nev, ncv, whichstr, tol, maxiter, mode, v0)
+       ARPACK.aupd_wrapper(matvecA, matvecB, solveSI, n, sym, iscmplx, bmat, nev, ncv, whichstr, tol, maxiter, mode, v0)
 
     # Postprocessing to get eigenvalues and eigenvectors
     output = ARPACK.eupd_wrapper(T, n, sym, iscmplx, bmat, nev, whichstr, ritzvec, TOL,
