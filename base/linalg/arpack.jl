@@ -105,11 +105,24 @@ function aupd_wrapper{T}(matvecA::Function, matvecB::Function, solveSI::Function
     return (resid, v, n, iparam, ipntr, workd, workl, lworkl, rwork, TOL)
 end
 
-function eupd_wrapper(T, n::Integer, sym::Bool, cmplx::Bool, bmat::ByteString,
-                      nev::Integer, which::ByteString, ritzvec::Bool,
-                      TOL::Array, resid, ncv::Integer, v, ldv, sigma, iparam, ipntr,
-                      workd, workl, lworkl, rwork)
-
+# T - element type of A
+# TR - real type associated with A e.g. typeof(abs(T))
+# I - Int type
+# the output is a tuple of
+#   Array{TR,1} - real eigenvalues (if sym = true) or empty (if sym = false)
+#   Array{TR,2} - real eigenvectors (if sym = true and ritzvec = true) or empty
+#   Array{TC,1} - complex eigenvalues (if sym = false) or empty (if sym = true)
+#   Array{TC,2} - complex eigenvectors (if sym = false and ritzvec = true) or empty
+#   ... and a bunch of ARPACK output
+function eupd_wrapper{T,TR,I <: BlasInt}(
+                      n::I, sym::Bool, cmplx::Bool, bmat::ByteString,
+                      nev::I, which::ByteString, ritzvec::Bool,
+                      TOL::Array, resid::Array{T,1}, ncv::I, 
+                      v::Array{T,2}, ldv, sigma::T, iparam::Array{I,1}, 
+                      ipntr::Array{I,1}, workd::Array{T,1}, workl::Array{T,1}, 
+                      lworkl::I, rwork::Array{TR,1})
+                      
+    TC = Complex{TR}
     howmny = "A"
     select = Array(BlasInt, ncv)
     info   = zeros(BlasInt, 1)
@@ -126,6 +139,25 @@ function eupd_wrapper(T, n::Integer, sym::Bool, cmplx::Bool, bmat::ByteString,
     elseif which == "SI"
         dmap = x->-imag(x)
     end
+    
+    # allocate the output 
+    if sym
+        nreal = nev
+        ncmplx = 0
+    else
+        nreal = 0
+        ncmplex = nev
+    end
+    
+    dreal = Array(TR,nreal)
+    dcmplx = Array(TC,ncmplx)
+    
+    if !ritzvec
+        nreal = 0
+        ncmplx = 0
+    end
+    vreal = Array(TR,n,nreal)
+    vcmplx = Array(TR,n,ncmplx)
 
     if cmplx
 
@@ -140,7 +172,11 @@ function eupd_wrapper(T, n::Integer, sym::Bool, cmplx::Bool, bmat::ByteString,
         end
 
         p = sortperm(dmap(d[1:nev]), rev=true)
-        return ritzvec ? (d[p], v[1:n, p],iparam[5],iparam[3],iparam[9],resid) : (d[p],iparam[5],iparam[3],iparam[9],resid)
+        
+        dcmplx[:] = d[p]
+        if ritzvec
+            vcmplx[:,:] = v[1:n,p]
+        end
 
     elseif sym
 
@@ -154,7 +190,13 @@ function eupd_wrapper(T, n::Integer, sym::Bool, cmplx::Bool, bmat::ByteString,
         end
 
         p = sortperm(dmap(d), rev=true)
-        return ritzvec ? (d[p], v[1:n, p],iparam[5],iparam[3],iparam[9],resid) : (d,iparam[5],iparam[3],iparam[9],resid)
+        
+        dreal[:] = d[p]
+        
+        if ritzvec
+            vreal[:,:] = v[1:n,p]
+        end
+        
 
     else
 
@@ -201,9 +243,14 @@ function eupd_wrapper(T, n::Integer, sym::Bool, cmplx::Bool, bmat::ByteString,
             p = sortperm(dmap(d), rev=true)
             p = p[1:nev]
         end
-
-        return ritzvec ? (d[p], evec[1:n, p],iparam[5],iparam[3],iparam[9],resid) : (d[p],iparam[5],iparam[3],iparam[9],resid)
+        
+        dcmplx[:] = d[p]
+        
+        if ritzvec
+            vcmplx[:,:] = evec[1:n,p]
+        end
     end
+    return (dreal, vreal, dcmplx, vcmplx,iparam[5],iparam[3],iparam[9],resid)
 
 end
 

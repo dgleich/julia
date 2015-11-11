@@ -107,7 +107,23 @@ The following keyword arguments are supported:
 ```
 """
 eigs(A, B; kwargs...) = _eigs(A, B; kwargs...)
-function _eigs(A, B;
+
+function _eigs(A, B; kwargs...)
+    output = eigs_arpack(A,B; kwargs...)
+    ritzvec::Bool = max(length(output[2]),length(output[4])) > 0
+    cmplx::Bool = length(output[3]) > length(output[1])
+    if cmplx
+        return ritzvec ?
+            (output[3],output[4], output[5],output[6],output[7],output[8]) :
+            (output[3],output[5],output[6],output[7],output[8])
+    else
+        return ritzvec ? 
+            (output[1],output[2], output[5],output[6],output[7],output[8]) :
+            (output[1],output[5],output[6],output[7],output[8])
+    end
+end
+
+function eigs_arpack(A, B;
               nev::Integer=6, ncv::Integer=max(20,2*nev+1), which=:LM,
               tol=0.0, maxiter::Integer=300, sigma=nothing, v0::Vector=zeros(eltype(A),(0,)),
               ritzvec::Bool=true)
@@ -229,12 +245,12 @@ function _eigs(A, B;
        ARPACK.aupd_wrapper(matvecA, matvecB, solveSI, n, sym, iscmplx, bmat, nev, ncv, whichstr, tol, maxiter, mode, v0)
 
     # Postprocessing to get eigenvalues and eigenvectors
-    output = ARPACK.eupd_wrapper(T, n, sym, iscmplx, bmat, nev, whichstr, ritzvec, TOL,
+    output = ARPACK.eupd_wrapper(n, sym, iscmplx, bmat, nev, whichstr, ritzvec, TOL,
                                  resid, ncv, v, ldv, sigma, iparam, ipntr, workd, workl, lworkl, rwork)
 
     # Issue 10495, 10701: Check that all eigenvalues are converged
-    nev = length(output[1])
-    nconv = output[ritzvec ? 3 : 2]
+    nev = max(length(output[1]),length(output[3]))
+    nconv = output[5]
     nev ≤ nconv || warn("not all wanted Ritz pairs converged. Requested: $nev, converged: $nconv")
 
     return output
@@ -287,5 +303,5 @@ function _svds(X; nsv::Int = 6, ritzvec::Bool = true, tol::Float64 = 0.0, maxite
     # calculating singular vectors
     left_sv  = sqrt(2) * ex[2][ 1:size(X,1),     ind ] .* sign(ex[1][ind]')
     right_sv = sqrt(2) * ex[2][ size(X,1)+1:end, ind ]
-    return (left_sv, sval, right_sv, ex[3], ex[4], ex[5], ex[6])
+    return (left_sv, sval, right_sv, ex[5], ex[6], ex[7], ex[8])
 end
