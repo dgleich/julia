@@ -1662,7 +1662,8 @@ static int push_root(jl_value_t *v, int d, int bits)
     // some values have special representations
     if (vt == (jl_value_t*)jl_simplevector_type) {
         size_t l = jl_svec_len(v);
-        MARK(v, bits = gc_setmark(v, l*sizeof(void*) + sizeof(jl_svec_t), GC_MARKED_NOESC));
+        MARK(v, bits = gc_setmark(v, l * sizeof(void*) +
+                                  offsetof(jl_svec_t, data), GC_MARKED_NOESC));
         jl_value_t **data = ((jl_svec_t*)v)->data;
         nptr += l;
         for(size_t i=0; i < l; i++) {
@@ -1759,7 +1760,7 @@ static int push_root(jl_value_t *v, int d, int bits)
         if (dt == jl_datatype_type) {
             size_t fieldsize =
                 jl_fielddesc_size(((jl_datatype_t*)v)->fielddesc_type);
-            dtsz = NWORDS(sizeof(jl_datatype_t) +
+            dtsz = NWORDS(offsetof(jl_datatype_t, fields) +
                           jl_datatype_nfields(v) * fieldsize) * sizeof(void*);
         } else {
             dtsz = jl_datatype_size(dt);

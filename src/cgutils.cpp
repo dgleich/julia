@@ -925,8 +925,9 @@ static Value *emit_nthptr_recast(Value *v, Value *idx, MDNode *tbaa, Type *ptype
 
 static Value *emit_typeptr_addr(Value *p)
 {
-   ssize_t offset = (offsetof(jl_taggedvalue_t,value) - offsetof(jl_taggedvalue_t,type)) / sizeof(jl_value_t*);
-   return emit_nthptr_addr(p, -offset);
+    ssize_t offset = (offsetof(jl_taggedvalue_t, value) -
+                      offsetof(jl_taggedvalue_t, type)) / sizeof(jl_value_t*);
+    return emit_nthptr_addr(p, -offset);
 }
 
 static Value *emit_typeof(Value *tt)

@@ -709,10 +709,11 @@ typedef struct {
 
 typedef struct {
     size_t len;
+    // variable length
     struct {
         int64_t isref;
         Function *f;
-    } data[];
+    } data[1];
 } cFunctionList_t;
 
 static jl_cgval_t emit_expr(jl_value_t *expr, jl_codectx_t *ctx, bool boxed=true,
@@ -4075,7 +4076,7 @@ static Function *gen_cfun_wrapper(jl_function_t *ff, jl_value_t *jlrettype, jl_t
 
     // Save the Function object reference
     int len = (list ? list->len : 0) + 1;
-    cFunctionList_t *list2 = (cFunctionList_t*)realloc(list, sizeof(*list)+sizeof(list->data[0])*len);
+    cFunctionList_t *list2 = (cFunctionList_t*)realloc(list, offsetof(cFunctionList_t, data)+sizeof(list->data[0])*len);
     if (!list2)
         jl_throw(jl_memory_exception);
     list2->len = len;
@@ -5482,8 +5483,8 @@ static void init_julia_llvm_env(Module *m)
         "jl_value_t",
         julia_h,
         71, // At the time of this writing. Not sure if it's worth it to keep this in sync
-        sizeof(jl_value_t)*8,
-        __alignof__(jl_value_t)*8,
+        0 * 8, // sizeof(jl_value_t) * 8,
+        __alignof__(void*) * 8, // __alignof__(jl_value_t) * 8,
         0, // Flags
 #ifdef LLVM37
         nullptr,    // Derived from

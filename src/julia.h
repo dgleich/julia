@@ -149,17 +149,14 @@ DLLEXPORT void jl_threading_profile();
 
 // core data types ------------------------------------------------------------
 
-#ifndef _COMPILER_MICROSOFT_
-#define JL_DATA_TYPE \
-    struct _jl_value_t *fieldptr0[0];
-#else
 #define JL_DATA_TYPE
-#endif
 
-typedef struct _jl_value_t {
-    JL_DATA_TYPE
-    struct _jl_value_t *fieldptr[];
-} jl_value_t;
+typedef struct _jl_value_t jl_value_t;
+
+// typedef struct _jl_value_t {
+//     JL_DATA_TYPE
+//     struct _jl_value_t *fieldptr[];
+// } jl_value_t;
 
 typedef struct {
     union {
@@ -169,11 +166,12 @@ typedef struct {
             uintptr_t gc_bits:2;
         };
     };
-    jl_value_t value;
+    // variable length
+    void *value[1];
 } jl_taggedvalue_t;
 
-#define jl_astaggedvalue__MACRO(v) container_of((v),jl_taggedvalue_t,value)
-#define jl_valueof__MACRO(v) (&((jl_taggedvalue_t*)(v))->value)
+#define jl_astaggedvalue__MACRO(v) container_of((v), jl_taggedvalue_t, value)
+#define jl_valueof__MACRO(v) ((jl_value_t*)((jl_taggedvalue_t*)(v))->value)
 #define jl_typeof__MACRO(v) ((jl_value_t*)(jl_astaggedvalue__MACRO(v)->type_bits&~(uintptr_t)15))
 #define jl_astaggedvalue jl_astaggedvalue__MACRO
 #define jl_valueof jl_valueof__MACRO
@@ -190,7 +188,8 @@ typedef struct _jl_sym_t {
     struct _jl_sym_t *left;
     struct _jl_sym_t *right;
     uptrint_t hash;    // precomputed hash value
-    JL_ATTRIBUTE_ALIGN_PTRSIZE(char name[]);
+    // variable length
+    JL_ATTRIBUTE_ALIGN_PTRSIZE(char name[1]);
 } jl_sym_t;
 
 typedef struct _jl_gensym_t {
@@ -201,7 +200,8 @@ typedef struct _jl_gensym_t {
 typedef struct {
     JL_DATA_TYPE
     size_t length;
-    jl_value_t *data[];
+    // variable length
+    jl_value_t *data[1];
 } jl_svec_t;
 
 typedef struct {
@@ -363,7 +363,8 @@ typedef struct _jl_datatype_t {
     uint32_t uid;
     void *struct_decl;  //llvm::Value*
     void *ditype; // llvm::MDNode* to be used as llvm::DIType(ditype)
-    size_t fields[];
+    // variable length
+    size_t fields[1];
 } jl_datatype_t;
 
 typedef struct {
@@ -767,16 +768,16 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 #define jl_tparam1(t)  jl_svecref(((jl_datatype_t*)(t))->parameters, 1)
 #define jl_tparam(t,i) jl_svecref(((jl_datatype_t*)(t))->parameters, i)
 
+// get a pointer to the data in a datatype
+#define jl_data_ptr(v)  ((jl_value_t**)v)
+
 #define jl_cell_data(a)   ((jl_value_t**)((jl_array_t*)a)->data)
-#define jl_string_data(s) ((char*)((jl_array_t*)(s)->fieldptr[0])->data)
-#define jl_string_len(s)  (jl_array_len(((jl_array_t*)(s)->fieldptr[0])))
-#define jl_iostr_data(s)  ((char*)((jl_array_t*)(s)->fieldptr[0])->data)
+#define jl_string_data(s) ((char*)((jl_array_t*)jl_data_ptr(s)[0])->data)
+#define jl_string_len(s)  (jl_array_len((jl_array_t*)(jl_data_ptr(s)[0])))
+#define jl_iostr_data(s)  ((char*)((jl_array_t*)jl_data_ptr(s)[0])->data)
 
 #define jl_gf_mtable(f) ((jl_methtable_t*)((jl_function_t*)(f))->env)
 #define jl_gf_name(f)   (jl_gf_mtable(f)->name)
-
-// get a pointer to the data in a datatype
-#define jl_data_ptr(v)  (((jl_value_t*)v)->fieldptr)
 
 // struct type info
 #define jl_field_name(st,i)    (jl_sym_t*)jl_svecref(((jl_datatype_t*)st)->name->names, (i))

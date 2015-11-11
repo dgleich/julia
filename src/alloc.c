@@ -370,7 +370,8 @@ static uptrint_t hash_symbol(const char *str, size_t len)
 
 static size_t symbol_nbytes(size_t len)
 {
-    return (sizeof_jl_taggedvalue_t+sizeof(jl_sym_t)+len+1+7)&-8;
+    return (sizeof_jl_taggedvalue_t + offsetof(jl_sym_t, name) +
+            len + 1 + 7) & -8;
 }
 
 static jl_sym_t *mk_symbol(const char *str, size_t len)
@@ -524,7 +525,8 @@ jl_datatype_t *jl_new_uninitialized_datatype(size_t nfields,
     uint32_t fielddesc_size = jl_fielddesc_size(fielddesc_type);
     jl_datatype_t *t = (jl_datatype_t*)
         newobj((jl_value_t*)jl_datatype_type,
-               NWORDS(sizeof(jl_datatype_t) + nfields * fielddesc_size));
+               NWORDS(offsetof(jl_datatype_t, fields) +
+                      nfields * fielddesc_size));
     // fielddesc_type should only be assigned here. It can cause data
     // corruption otherwise.
     t->fielddesc_type = fielddesc_type;
@@ -850,7 +852,7 @@ DLLEXPORT jl_value_t *jl_new_box(jl_value_t *v)
     jl_value_t *box = (jl_value_t*)jl_gc_alloc_1w();
     jl_set_typeof(box, jl_box_any_type);
     // if (v) jl_gc_wb(box, v); // write block not needed: box was just allocated
-    box->fieldptr[0] = v;
+    *(jl_value_t**)box = v;
     return box;
 }
 
